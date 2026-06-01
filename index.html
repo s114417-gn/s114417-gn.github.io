@@ -1,11 +1,261 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>HAHA</title>
-    <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2F2Wmr1t0IXC4oR_a9_0FprPMb8Mf0ijCpw&s">
-  </head>
-  <body>
-    hello world!
-  </body>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>馬卡龍客製化轉盤</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            background-color: #fdfaf6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #555;
+        }
+        .container {
+            display: flex;
+            gap: 40px;
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 220px;
+        }
+        textarea {
+            resize: none;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            outline: none;
+            line-height: 1.5;
+            transition: border-color 0.3s;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: auto;
+        }
+        textarea:focus {
+            border-color: #ffd1dc;
+        }
+        button {
+            padding: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            /* 改為更明亮、飽和的亮眼珊瑚紅 */
+            background-color: #ff6b81; 
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 107, 129, 0.4);
+        }
+        button:hover {
+            background-color: #ff4757; /* 游標滑過時更深一點的紅色 */
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            background-color: #e0e0e0;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result-box {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #ff4757;
+            min-height: 30px;
+            margin-top: 10px;
+        }
+        .wheel-container {
+            position: relative;
+            width: 400px;
+            height: 400px;
+        }
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #ff6b81; /* 指針顏色同步變亮 */
+            z-index: 10;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="controls">
+        <label for="optionsInput"><strong>輸入選項 (即時更新)：</strong></label>
+        <textarea id="optionsInput" rows="10" wrap="off">吃火鍋
+吃拉麵
+吃便當
+吃義大利麵
+吃麥當勞
+減肥不吃</textarea>
+        <button id="spinBtn">開始旋轉！</button>
+        <div class="result-box" id="resultText"></div>
+    </div>
+
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <canvas id="wheelCanvas" width="400" height="400"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const optionsInput = document.getElementById('optionsInput');
+    const spinBtn = document.getElementById('spinBtn');
+    const resultText = document.getElementById('resultText');
+
+    let options = [];
+    let currentRotation = 0;
+
+    // 取得馬卡龍色系 (高明度 80%、中等飽和度 75%)
+    function getMacaronColor(index, total) {
+        const hue = (index * 360) / total;
+        return `hsl(${hue}, 75%, 80%)`;
+    }
+
+    // 初始化與更新轉盤
+    function initWheel() {
+        options = optionsInput.value.split('\n').map(opt => opt.trim()).filter(opt => opt !== "");
+        
+        if (options.length === 0) {
+            options = ["請輸入選項"];
+        }
+        
+        drawWheel();
+    }
+
+    // 繪製轉盤
+    function drawWheel() {
+        const numOptions = options.length;
+        const sliceAngle = (2 * Math.PI) / numOptions;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = centerX;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < numOptions; i++) {
+            const startAngle = i * sliceAngle;
+            const endAngle = startAngle + sliceAngle;
+
+            // 畫扇形
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.fillStyle = getMacaronColor(i, numOptions);
+            ctx.fill();
+            
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#ffffff";
+            ctx.stroke();
+
+            // 寫上文字
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(startAngle + sliceAngle / 2);
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#555555"; 
+            
+            // 【動態字體大小計算】
+            // 1. 根據扇形的狹窄程度(選項數量)決定初始最大字體
+            // sliceAngle * radius 大約是扇形外圍的弧長，乘上 0.6 作為安全高度
+            let fontSize = Math.max(10, Math.min(22, sliceAngle * radius * 0.6));
+            ctx.font = `bold ${fontSize}px 'Microsoft JhengHei', sans-serif`;
+            
+            // 2. 測量文字寬度，如果太長就繼續縮小
+            let textWidth = ctx.measureText(options[i]).width;
+            let maxTextWidth = radius - 40; // 預留邊距，避免文字貼齊邊緣或中心
+            
+            if (textWidth > maxTextWidth) {
+                // 按比例縮小字體以符合最大寬度
+                fontSize = fontSize * (maxTextWidth / textWidth);
+                ctx.font = `bold ${fontSize}px 'Microsoft JhengHei', sans-serif`;
+            }
+
+            ctx.fillText(options[i], radius - 20, 0);
+            ctx.restore();
+        }
+    }
+
+    // 旋轉邏輯
+    function spinWheel() {
+        if (options.length === 0 || options[0] === "請輸入選項") return;
+
+        spinBtn.disabled = true;
+        optionsInput.disabled = true;
+        resultText.innerText = "旋轉中...";
+
+        // Math.random() 確保每個索引出現的機率絕對相同
+        const winnerIndex = Math.floor(Math.random() * options.length);
+        
+        const sliceAngleDeg = 360 / options.length;
+        // 算出該獎項在圓上的中心角度
+        const initialWinnerCenterDeg = (winnerIndex + 0.5) * sliceAngleDeg;
+        // 目標是要讓該中心點對齊 270 度 (正上方指針)
+        const targetBase = 270 - initialWinnerCenterDeg;
+        
+        const normalizedTarget = (targetBase % 360 + 360) % 360;
+        const normalizedCurrent = (currentRotation % 360 + 360) % 360;
+        
+        let rotationDiff = normalizedTarget - normalizedCurrent;
+        if (rotationDiff <= 0) {
+            rotationDiff += 360;
+        }
+
+        // 每次旋轉固定加上 5 圈 (1800度) 的動畫效果
+        currentRotation += rotationDiff + 1800;
+
+        canvas.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+        setTimeout(() => {
+            resultText.innerText = `🎉 結果：${options[winnerIndex]}`;
+            spinBtn.disabled = false;
+            optionsInput.disabled = false;
+        }, 4000);
+    }
+
+    optionsInput.addEventListener('input', () => {
+        canvas.style.transition = 'none';
+        currentRotation = 0;
+        canvas.style.transform = `rotate(0deg)`;
+        resultText.innerText = "";
+        initWheel();
+    });
+    
+    spinBtn.addEventListener('click', spinWheel);
+
+    initWheel();
+</script>
+
+</body>
 </html>
