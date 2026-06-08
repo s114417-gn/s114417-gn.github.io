@@ -2,33 +2,47 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>馬卡龍客製化轉盤</title>
     <style>
+        /* 基礎設定：確保在所有裝置上都能滿版且不會產生多餘捲軸 */
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: "Microsoft JhengHei", Arial, sans-serif;
             background-color: #fdfaf6;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
             color: #555;
         }
+        
+        /* 容器設定：預設為電腦版的左右排列 */
         .container {
             display: flex;
+            flex-direction: row;
             gap: 40px;
             background: white;
             padding: 30px;
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            max-width: 900px;
+            width: 100%;
+            align-items: center;
         }
+
         .controls {
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 220px;
+            width: 250px;
+            flex-shrink: 0;
         }
+
         textarea {
             resize: none;
             padding: 12px;
@@ -45,21 +59,22 @@
         textarea:focus {
             border-color: #ffd1dc;
         }
+
         button {
             padding: 14px;
             font-size: 18px;
             font-weight: bold;
             color: white;
-            /* 改為更明亮、飽和的亮眼珊瑚紅 */
             background-color: #ff6b81; 
             border: none;
             border-radius: 12px;
             cursor: pointer;
             transition: transform 0.1s, background-color 0.3s;
             box-shadow: 0 4px 15px rgba(255, 107, 129, 0.4);
+            width: 100%;
         }
         button:hover {
-            background-color: #ff4757; /* 游標滑過時更深一點的紅色 */
+            background-color: #ff4757;
             transform: translateY(-2px);
         }
         button:active {
@@ -71,36 +86,70 @@
             cursor: not-allowed;
             transform: none;
         }
+
         .result-box {
             text-align: center;
             font-size: 20px;
             font-weight: bold;
             color: #ff4757;
             min-height: 30px;
-            margin-top: 10px;
         }
+
+        /* 轉盤容器：改為自適應正方形 */
+        .wheel-wrapper {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        
         .wheel-container {
             position: relative;
-            width: 400px;
-            height: 400px;
+            width: 100%;
+            max-width: 400px; /* 電腦版最大寬度 */
+            aspect-ratio: 1 / 1; /* 保持正方形比例 */
         }
+
         .pointer {
             position: absolute;
-            top: -20px;
+            top: -5%; /* 改用百分比，讓指針隨轉盤縮放時保持好比例 */
             left: 50%;
             transform: translateX(-50%);
             width: 0; 
             height: 0; 
-            border-left: 20px solid transparent;
-            border-right: 20px solid transparent;
-            border-top: 40px solid #ff6b81; /* 指針顏色同步變亮 */
+            /* 指針大小使用 vw 或固定大小的折衷方案，這裡保持稍微固定但相對位置正確 */
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ff6b81; 
             z-index: 10;
         }
+
+        /* Canvas 本身填滿父容器，內部畫質保持 400x400 確保銳利度 */
         canvas {
             width: 100%;
             height: 100%;
             border-radius: 50%;
             box-shadow: 0 0 20px rgba(0,0,0,0.08);
+            display: block;
+        }
+
+        /* 📱 手機版與平板版 RWD 設定 (寬度小於 768px 時觸發) */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column; /* 改為上下排列 */
+                padding: 20px;
+                gap: 20px;
+            }
+            .controls {
+                width: 100%; /* 輸入框與按鈕撐滿寬度 */
+            }
+            textarea {
+                rows: 6; /* 手機上稍微減少預設行數，避免佔用太多空間 */
+            }
+            .wheel-container {
+                max-width: 320px; /* 手機上限制一下轉盤最大寬度避免過於擁擠 */
+            }
         }
     </style>
 </head>
@@ -109,7 +158,7 @@
 <div class="container">
     <div class="controls">
         <label for="optionsInput"><strong>輸入選項 (即時更新)：</strong></label>
-        <textarea id="optionsInput" rows="10" wrap="off">吃火鍋
+        <textarea id="optionsInput" rows="6" wrap="off">吃火鍋
 吃拉麵
 吃便當
 吃義大利麵
@@ -119,9 +168,11 @@
         <div class="result-box" id="resultText"></div>
     </div>
 
-    <div class="wheel-container">
-        <div class="pointer"></div>
-        <canvas id="wheelCanvas" width="400" height="400"></canvas>
+    <div class="wheel-wrapper">
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="400" height="400"></canvas>
+        </div>
     </div>
 </div>
 
@@ -135,13 +186,11 @@
     let options = [];
     let currentRotation = 0;
 
-    // 取得馬卡龍色系 (高明度 80%、中等飽和度 75%)
     function getMacaronColor(index, total) {
         const hue = (index * 360) / total;
         return `hsl(${hue}, 75%, 80%)`;
     }
 
-    // 初始化與更新轉盤
     function initWheel() {
         options = optionsInput.value.split('\n').map(opt => opt.trim()).filter(opt => opt !== "");
         
@@ -152,21 +201,21 @@
         drawWheel();
     }
 
-    // 繪製轉盤
     function drawWheel() {
         const numOptions = options.length;
         const sliceAngle = (2 * Math.PI) / numOptions;
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = centerX;
+        
+        // 內部繪圖邏輯始終以 400x400 的解析度為基準
+        const centerX = 200;
+        const centerY = 200;
+        const radius = 200;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, 400, 400);
 
         for (let i = 0; i < numOptions; i++) {
             const startAngle = i * sliceAngle;
             const endAngle = startAngle + sliceAngle;
 
-            // 畫扇形
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.arc(centerX, centerY, radius, startAngle, endAngle);
@@ -177,7 +226,6 @@
             ctx.strokeStyle = "#ffffff";
             ctx.stroke();
 
-            // 寫上文字
             ctx.save();
             ctx.translate(centerX, centerY);
             ctx.rotate(startAngle + sliceAngle / 2);
@@ -185,18 +233,13 @@
             ctx.textBaseline = "middle";
             ctx.fillStyle = "#555555"; 
             
-            // 【動態字體大小計算】
-            // 1. 根據扇形的狹窄程度(選項數量)決定初始最大字體
-            // sliceAngle * radius 大約是扇形外圍的弧長，乘上 0.6 作為安全高度
             let fontSize = Math.max(10, Math.min(22, sliceAngle * radius * 0.6));
             ctx.font = `bold ${fontSize}px 'Microsoft JhengHei', sans-serif`;
             
-            // 2. 測量文字寬度，如果太長就繼續縮小
             let textWidth = ctx.measureText(options[i]).width;
-            let maxTextWidth = radius - 40; // 預留邊距，避免文字貼齊邊緣或中心
+            let maxTextWidth = radius - 40; 
             
             if (textWidth > maxTextWidth) {
-                // 按比例縮小字體以符合最大寬度
                 fontSize = fontSize * (maxTextWidth / textWidth);
                 ctx.font = `bold ${fontSize}px 'Microsoft JhengHei', sans-serif`;
             }
@@ -206,7 +249,6 @@
         }
     }
 
-    // 旋轉邏輯
     function spinWheel() {
         if (options.length === 0 || options[0] === "請輸入選項") return;
 
@@ -214,13 +256,10 @@
         optionsInput.disabled = true;
         resultText.innerText = "旋轉中...";
 
-        // Math.random() 確保每個索引出現的機率絕對相同
         const winnerIndex = Math.floor(Math.random() * options.length);
         
         const sliceAngleDeg = 360 / options.length;
-        // 算出該獎項在圓上的中心角度
         const initialWinnerCenterDeg = (winnerIndex + 0.5) * sliceAngleDeg;
-        // 目標是要讓該中心點對齊 270 度 (正上方指針)
         const targetBase = 270 - initialWinnerCenterDeg;
         
         const normalizedTarget = (targetBase % 360 + 360) % 360;
@@ -231,7 +270,6 @@
             rotationDiff += 360;
         }
 
-        // 每次旋轉固定加上 5 圈 (1800度) 的動畫效果
         currentRotation += rotationDiff + 1800;
 
         canvas.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)';
